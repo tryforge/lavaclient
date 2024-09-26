@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "types": ["@types/node"],
+        "lib": ["ESNext"],
+        "rootDir": "./src",
+        "target": "ES2021",
+        "module": "Node16",
+        "moduleResolution": "NodeNext",
+    },
+    "include": ["src"],
+    "exclude": ["examples", "node_modules"]
+}
