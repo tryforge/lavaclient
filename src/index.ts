@@ -19,6 +19,20 @@ export const Routes = {
     Session: (version: number, sesionId: string) => `/v${version}/sessions/${sesionId}`,
     Player: (version: number, sessionId: string, guildId: string) => `/v${version}/sessions/${sessionId}/players/${guildId}`
 }
+export const Events = {
+    Session: {
+        Connecting: "connecting",
+        Disconnected: "disconnected",
+        Destroyed: "destroyed",
+        Ready: "ready",
+        Stats: "stats",
+        PlayerState: "playerState",
+        Event: "event",
+
+        TrackStart: "trackStart",
+        TrackEnd: "trackEnd"
+    }
+}
 
 // Structures
 import { Client } from "./structures/Client";

@@ -1,6 +1,7 @@
-import { WebSocket } from "ws";
-import { Pool } from "undici"
+import { Client as DiscordClient } from "discord.js";
 import { API } from "./API";
+import { ClientName } from "..";
+import { EventEmitter } from "events"
 
 export type ClientOptions =
 {
@@ -8,18 +9,25 @@ export type ClientOptions =
     password: string
 }
 
-export class Client {
-    public readonly api: API
-    public constructor(public readonly options: ClientOptions) {
-        options = Object.freeze(options)
+export type ClientEvents =
+{
 
+}
+
+export class Client extends EventEmitter<ClientEvents> {
+    public readonly api: API
+    public readonly sockets = new Map<string, WebSocket>()
+    public constructor(public readonly options: ClientOptions) {
+        super()
+        options = Object.freeze(options)
         this.api = new API(this)
     }
 
-    private configureSocket() {
-        const Headers = {
-            "Authorization": this.options.password,
-            "Client-Name": ``
-        }
+    public addClient(client: DiscordClient) {
+
+    }
+
+    private configureSocket(userId: string) {
+        
     }
 }

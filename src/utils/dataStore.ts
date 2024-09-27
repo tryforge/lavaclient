@@ -1,10 +1,12 @@
 import { 
+    APIVoiceState,
     GatewayOpcodes, 
     GatewayVoiceServerUpdateDispatchData, 
     GatewayVoiceStateUpdateData, 
     InternalDiscordGatewayAdapterImplementerMethods, 
     InternalDiscordGatewayAdapterLibraryMethods 
 } from "discord.js"
+import { Client } from "../structures/Client"
 
 export type JoinVoiceChannelConfig = 
 {
@@ -32,51 +34,76 @@ export function createJoinVoiceChannelPayload(config: JoinVoiceChannelConfig) {
         }
     }
 }
-export type VoicePacket =
+
+export type VoicePackets =
 {
     server: GatewayVoiceServerUpdateDispatchData
-    state: GatewayVoiceStateUpdateData
+    states: Map<string, APIVoiceState>
 }
 
 export type VoiceConnection =
 {
-    packets: VoicePacket
+    guildId: string
+    packets: VoicePackets
+    destroy(): void
+    bind(client: Client): void
+    remove(client: Client): void
     addServerPacket(data: GatewayVoiceServerUpdateDispatchData): void
-    addStatePacket(data: GatewayVoiceStateUpdateData): void
+    addStatePacket(data: APIVoiceState): void
 }
 
 const voiceConnections = new Map<string, VoiceConnection>()
-function voice_addServerPacket(
-    this: VoiceConnection,
-    data: GatewayVoiceServerUpdateDispatchData
-    ) {
-    this.packets.server = data
-}
-
-function voice_addStatePacket(
-    this: VoiceConnection,
-    data: GatewayVoiceStateUpdateData
-    ) {
-    this.packets.state = data
+const voiceMethods = {
+    bind(this: VoiceConnection, client: Client) {
+        
+    },
+    remove(this: VoiceConnection, client: Client) {
+        
+    },
+    addServerPacket(this: VoiceConnection, data: GatewayVoiceServerUpdateDispatchData) {
+        if (! data.endpoint) {
+            delete this.packets['server']
+            return
+        }
+        this.packets.server = data
+    },
+    addStatePacket(this: VoiceConnection, data: APIVoiceState) {
+        if (data.channel_id === null) {
+            this.packets.states.delete(data.user_id)
+        }
+        this.packets.states.set(data.user_id, data)       
+    },
+    destroy(this: VoiceConnection) {
+        this.packets.states.clear()
+        voiceConnections.delete(this.guildId)
+    }
 }
 
 export function joinVoiceChannel(joinConfig: JoinConfig & JoinVoiceChannelConfig) {
-    const voiceChannelPayload = createJoinVoiceChannelPayload(joinConfig)
-    const { adapterCreator } = joinConfig
+    if (voiceConnections.has(joinConfig.guildId)) {
+        return voiceConnections.get(joinConfig.guildId)
+    }
 
-    const voiceConnection = { packets: {} } as VoiceConnection
-    voiceConnection.addServerPacket = voice_addServerPacket.bind(voiceConnection)
-    voiceConnection.addStatePacket = voice_addStatePacket.bind(voiceConnection)
+    const voiceChannelPayload = createJoinVoiceChannelPayload(joinConfig)
+    const { guildId,adapterCreator } = joinConfig
+
+    const voiceConnection = {
+        guildId: guildId,
+        packets: { states: new Map() }
+    } as VoiceConnection
+    voiceConnection.addServerPacket = voiceMethods.addServerPacket.bind(voiceConnection)
+    voiceConnection.addStatePacket = voiceMethods.addStatePacket.bind(voiceConnection)
+    voiceConnection.destroy = voiceMethods.destroy.bind(voiceConnection)
 
     const adapter = adapterCreator({
         destroy() {
-
+            voiceConnection.destroy()
         },
         onVoiceServerUpdate(data) {
-            
+            voiceConnection.addServerPacket(data)       
         },
         onVoiceStateUpdate(data) {
-            
+            voiceConnection.addStatePacket(data)
         },
     })
 
