@@ -4,7 +4,7 @@ import {
     type InternalDiscordGatewayAdapterLibraryMethods 
 } from "discord.js"
 import { Client, Routes } from "./client"
-import { Track, TrackInfo } from "../types"
+import { Track, TrackInfo } from "../types/entity"
 import { Dispatcher } from "undici"
 
 // Constants
@@ -81,8 +81,7 @@ export type PlayerController =
     volume(decibel: number): void
 }
 
-export function createPlayerController(client: Client, joinConfig: JoinConfig) {
-    const { guildId, adapterCreator } = joinConfig
+export function createPlayerController(client: Client, guildId: string) {
     const playerController = {
         guildId,
         destroy() {
@@ -113,6 +112,9 @@ export function createPlayerController(client: Client, joinConfig: JoinConfig) {
         },
         resume() {
             client.playerUpdate(guildId, { paused: false })
+        },
+        [Symbol.for("nodejs.inspect.custom")]() {
+            return "PlayerController"
         }
     }
 
@@ -140,6 +142,4 @@ export function joinVoiceChannel(joinConfig: JoinVoiceChannelConfig & JoinConfig
     })
 
     methods.sendPayload(voiceChannelPayload)
-
-    return 
 }

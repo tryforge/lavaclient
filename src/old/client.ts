@@ -5,7 +5,7 @@ import { Dispatcher, Pool } from "undici";
 import type { DataReader, DataWriter } from '@lavacoffee/datarw'
 import type yts from 'yt-search'
 import type * as scdl from 'soundcloud.ts'
-import { Track, TrackInfo } from "../types";
+import { Track, TrackInfo } from "../types/entity";
 import { PlayerController, VoiceStatePayload } from "./dataStore";
 import EventEmitter from "events";
 
@@ -232,7 +232,7 @@ export class Client extends EventEmitter {
     }
 
     // Players store
-    protected addPlayer() {
+    protected addPlayer(player: PlayerController) {
         
     }
 
