@@ -1,7 +1,10 @@
+import { name, version } from "../package.json"
+
 // Some constants
 export const APIVersion = 4
 export const TrackInfoVersion = 2
 export const TrackInfoVersioned = 1
+export const ClientName = (userId: string) => `${name}(${version}, ${userId})`
 export const Routes = {
     /** Lavalink Information */
     Info: (version: number) => `/v${version}/info`,

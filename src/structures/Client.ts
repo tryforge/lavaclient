@@ -9,8 +9,6 @@ export type ClientOptions =
 }
 
 export class Client {
-    #socket: WebSocket
-
     public readonly api: API
     public constructor(public readonly options: ClientOptions) {
         options = Object.freeze(options)
@@ -23,7 +21,5 @@ export class Client {
             "Authorization": this.options.password,
             "Client-Name": ``
         }
-
-        this.#socket = new WebSocket(this.options.url)
     }
 }
