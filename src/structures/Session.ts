@@ -1,19 +1,17 @@
 import { WebSocket } from "ws";
-import { Client } from "./Client";
-import { Packet, StatsPacket } from "../types/packets";
+import { EventPacket, Packet, StatsPacket } from "../types/packets";
 import { PlayerState } from "../types/packet_payloads";
-import { Track } from "../types/entity";
-import { EndReasons } from "../types/events";
 import EventEmitter from "events";
 import { ClientName, Events } from "..";
 
 interface SessionEvents {
+    connecting: []
+    disconnected: []
+    destroyed: []
     ready: [sessionId: string, resumed: boolean]
     stats: [stats: Omit<StatsPacket, 'op'>]
-    playerState: [state: PlayerState]
-    event: []
-    trackStart: [track: Track]
-    trackEnd: [track: Track, reason: EndReasons]
+    playerUpdate: [guildId: string, state: PlayerState]
+    event: [packet: Omit<EventPacket, 'op'>]
 }
 
 interface SessionOptions {
@@ -37,6 +35,8 @@ export class Session extends EventEmitter<SessionEvents> {
         typeof Events.Session.Disconnected |
         typeof Events.Session.Ready |
         typeof Events.Session.Destroyed);
+    
+    public stats: Omit<StatsPacket, 'op'>
     public constructor(public readonly options: SessionOptions) {
         super()
 
@@ -44,14 +44,23 @@ export class Session extends EventEmitter<SessionEvents> {
             connected: false,
             interval: null
         }
+        this.configureNetworking()
     }
 
     public get status() { return this.#status }
 
     public get state() { return this.#state }
-    public set state(value: SessionState) {
-        if (! Object.isFrozen(this.#state))
-            Object.assign(this.#state, value)
+
+    public destroy() {
+        this.#status = Events.Session.Destroyed
+        this.#state = Object.freeze({
+            ...this.#state,
+            interval: null,
+            connected: false
+        })
+
+        if (this.#socket) this.#socket.close(1001)
+        this.emit("destroyed")
     }
 
     public configureNetworking() {
@@ -66,16 +75,24 @@ export class Session extends EventEmitter<SessionEvents> {
         }
 
         this.#socket = new WebSocket(this.options.url, { headers: Headers })
+        this.#socket.once("open", this._onOpen.bind(this))
+        this.#socket.once("close", this._onClose.bind(this))
+        this.#socket.once("error", this._onError.bind(this))
+        this.#socket.on("message", this._onMessage.bind(this))
     }
 
     _onOpen() {
         this.#status = Events.Session.Ready
-        this.state.connected = true
+        this.#state.connected = true
     }
 
     _onClose() {
         this.#status = Events.Session.Disconnected
-        this.state.connected = false
+        this.#state.connected = false
+    }
+
+    _onError() {
+
     }
 
     _onMessage(data: Buffer) {
@@ -88,7 +105,18 @@ export class Session extends EventEmitter<SessionEvents> {
 
         switch (packet.op) {
             case "ready": {
-                this.state.sessionId = packet.sessionId
+                this.#state.sessionId = packet.sessionId
+                this.emit("ready", packet.sessionId, packet.resumed)
+            }
+            break
+            case "stats": {
+                delete packet['op']
+                this.stats = packet
+                this.emit("stats", packet)
+            }
+            break
+            case "playerUpdate": {
+                this.emit("playerUpdate", packet.guildId, packet.state)
             }
         }
     }
