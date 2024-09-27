@@ -3,8 +3,9 @@ import {
     type InternalDiscordGatewayAdapterImplementerMethods, 
     type InternalDiscordGatewayAdapterLibraryMethods 
 } from "discord.js"
-import { Client, Routes } from "./core/client"
-import { Track, TrackInfo } from "./types"
+import { Client, Routes } from "./client"
+import { Track, TrackInfo } from "../types"
+import { Dispatcher } from "undici"
 
 // Constants
 
@@ -57,7 +58,7 @@ function createJoinVoiceChannelPayload(joinConfig: JoinVoiceChannelConfig) {
     }
 }
 
-function getOrCreateVoiceState(guildId: string): VoiceStatePayload {
+export function getOrCreateVoiceState(guildId: string): VoiceStatePayload {
     if (voiceStates.has(guildId)) return voiceStates.get(guildId)
 
     const state = { endpoint: "", token: "", sessionId: "" }
@@ -65,7 +66,23 @@ function getOrCreateVoiceState(guildId: string): VoiceStatePayload {
     return state
 }
 
-export function createPlayerController(client: Client, guildId: string) {
+export type PlayerController =
+{
+    guildId: string
+    destroy(): void
+
+    // Lavalink api methods
+    play(encoded: string): void
+    play(track: Track): void
+    play(track: string | Track): void
+    resume(): void
+    pause(): void
+    seek(positionInSeconds: number): void
+    volume(decibel: number): void
+}
+
+export function createPlayerController(client: Client, joinConfig: JoinConfig) {
+    const { guildId, adapterCreator } = joinConfig
     const playerController = {
         guildId,
         destroy() {
@@ -80,25 +97,22 @@ export function createPlayerController(client: Client, guildId: string) {
             playerStates.delete(guildId)
         },
 
+        // Lavalink API Methods
         play(track: string | Track) {
             const encoded = typeof track === "string" ? track : track.encoded
-
-            return client.playerUpdate(guildId, {
-                track: { encoded }
-            }, true)
+            client.playerUpdate(guildId, { track: {encoded} })
         },
-
         volume(decibel: number) {
-            return client.playerUpdate(guildId, { volume: decibel * 100 })
+            client.playerUpdate(guildId, { volume: decibel * 100 })
         },
         seek(positionInSeconds: number) {
-            return client.playerUpdate(guildId, { position: positionInSeconds * 1000 })
+            client.playerUpdate(guildId, { position: positionInSeconds * 1000 })
         },
         pause() {
-            return client.playerUpdate(guildId, { paused: true })
+            client.playerUpdate(guildId, { paused: true })
         },
         resume() {
-            return client.playerUpdate(guildId, { paused: false })
+            client.playerUpdate(guildId, { paused: false })
         }
     }
 
@@ -126,4 +140,6 @@ export function joinVoiceChannel(joinConfig: JoinVoiceChannelConfig & JoinConfig
     })
 
     methods.sendPayload(voiceChannelPayload)
+
+    return 
 }

@@ -6,7 +6,7 @@ import type { DataReader, DataWriter } from '@lavacoffee/datarw'
 import type yts from 'yt-search'
 import type * as scdl from 'soundcloud.ts'
 import { Track, TrackInfo } from "../types";
-import { VoiceStatePayload } from "..";
+import { PlayerController, VoiceStatePayload } from "./dataStore";
 import EventEmitter from "events";
 
 export const Version = 4
@@ -192,6 +192,7 @@ type UpdatePlayerPayload =
     paused?: boolean
     filters?: any
     voice?: VoiceStatePayload
+    noReplace?: boolean
 }
 
 type UpdatePlayerTrack =
@@ -216,6 +217,8 @@ export class Client extends EventEmitter {
         userId: "",
         sessionId: ""
     }
+    #players = new Map<string, PlayerController>()
+    #updateQueue = new Map<string, UpdatePlayerPayload>()
     public stats: Omit<StatsPacket, "op">
     public constructor(options: ClientOptions) {
         super()
@@ -226,6 +229,11 @@ export class Client extends EventEmitter {
          this.#options = structuredClone(options)
          this.#api = new Pool(options.url)
          this.#authorization = options.password
+    }
+
+    // Players store
+    protected addPlayer() {
+        
     }
 
     request(options: Dispatcher.RequestOptions) {
@@ -239,18 +247,36 @@ export class Client extends EventEmitter {
     playerUpdate(
         guildId: string, 
         payload: UpdatePlayerPayload,
-        skipPlayingTrack = false
     ) {
-        return this.#api.request({
-            method: "PATCH",
-            path: `${Version}/${Routes.Player(this.#state.sessionId, guildId)}`,
-            body: JSON.stringify(payload),
-            query: { "noReplace": !skipPlayingTrack }
-        })
+        if (! this.#updateQueue.has(guildId)) {
+            this.#updateQueue.set(guildId, payload)
+
+            setImmediate(() => {
+                const payload = this.#updateQueue.get(guildId)
+                const noReplace = Boolean(payload.noReplace)
+                delete payload['noReplace']
+
+                this.#api.request({
+                    method: "PATCH",
+                    path: `${Version}/${Routes.Player(this.#state.sessionId, guildId)}`,
+                    body: JSON.stringify(payload),
+                    query: { noReplace }
+                })
+
+                this.#updateQueue.delete(guildId)
+            })
+            return
+        }
+
+        const p = this.#updateQueue.get(guildId)
+        Object.assign(p, payload)
     }
 
     // WebSocket Methods
-    run(userId: string) {
+
+    // Thanks @discordjs/voice for smart names
+    // and smart approaches
+    private configureNetworking(userId: string) {
         this.#state.userId = userId
         this._createNetSocket()
     }
